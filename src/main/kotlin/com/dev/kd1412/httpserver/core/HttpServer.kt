@@ -1,36 +1,67 @@
 package com.dev.kd1412.httpserver.core
 
-import com.dev.kd1412.httpserver.config.ConfigurationManager
+import com.dev.kd1412.httpserver.config.ConfigurationManager.config
+import com.sun.net.httpserver.HttpServer
 import java.io.File
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
-import java.net.ServerSocket
-import java.net.Socket
+import java.net.InetSocketAddress
+import java.nio.charset.Charset
 
+typealias JHttpServer = HttpServer
 
-class HttpServer() {
+class HttpServer {
+    private lateinit var server: HttpServer
 
-    var running: Boolean = false
+    fun startServer() {
+        server = JHttpServer.create(InetSocketAddress(8080), 0)
+        with(server) {
+            createContext("/") { t ->
+                val response = File("${config.webroot!!}index.html").readBytes()
+                t.sendResponseHeaders(200, response.size.toLong())
+                val os = t.responseBody
+                os.write(response)
+                os.close()
+            }
+            createContext("/login") { t ->
+                val os = t.responseBody
+                if (t.requestMethod == "POST") {
+                    val body = t.requestBody.readBytes().toString(Charset.defaultCharset()).split("&").map {
+                        val list = it.split("=")
+                        list[0] to list[1]
+                    }.toMap()
 
-    fun startServer(){
-        val CONFIGFILE_PATH = "src/main/resources/https.json"
-        val config = ConfigurationManager.loadConfigurationFile(CONFIGFILE_PATH)
-        println("Webser using port: ${config.port}")
-        println("Webser using webroot: ${config.webroot}")
+                    if (body["username"] == "admin" && body["password"] == "123") {
+                        val response = "".toByteArray()
+                        t.sendResponseHeaders(200, response.size.toLong())
+                        os.write(response)
+                    }
+                } else {
+                    val response = "cut".toByteArray()
+                    t.sendResponseHeaders(200, response.size.toLong())
+                    os.write(response)
+                }
+                os.close()
+            }
+            createContext("/success") { t ->
+                val response = File("${config.webroot!!}index.html").readBytes()
+                t.sendResponseHeaders(200, response.size.toLong())
+                val os = t.responseBody
+                os.write(response)
+                os.close()
+            }
+        }
+        server.executor = null // creates a default executor
 
-        try {
-            val httpServerThread  = HttpServerThread(config.port,config.webroot)
-            httpServerThread.start()
-            running =!running
-        }catch (e: IOException){ }
+        server.start()
+        println("Server is running on http://localhost:${config.port} ")
+        isRunning = true
+        Runtime.getRuntime().exec(arrayOf("chromium-browser", "http://localhost:${config.port}"))
     }
 
-    fun stopServer(){
-        running = !running
-    }
+    var isRunning = false
+        private set
 
-    fun isRunning(): Boolean {
-        return running
+    fun stopServer() = server.stop(0).also {
+        isRunning = false
+        println("Server is closed...")
     }
 }
