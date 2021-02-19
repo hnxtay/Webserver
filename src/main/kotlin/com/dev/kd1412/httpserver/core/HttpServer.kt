@@ -41,8 +41,9 @@ class HttpServer {
                 }
                 os.close()
             }
-            createContext("/success") { t ->
-                val response = File("${config.webroot!!}index.html").readBytes()
+            createContext("/" +
+                    "") { t ->
+                val response = File("${config.webroot!!}success.html").readBytes()
                 t.sendResponseHeaders(200, response.size.toLong())
                 val os = t.responseBody
                 os.write(response)
